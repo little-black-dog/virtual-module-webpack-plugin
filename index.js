@@ -2,6 +2,7 @@
 
 'use strict';
 
+const path = require('path');
 const VirtualStats = require('./virtual-stats');
 
 class VirtualModulePlugin {
@@ -31,8 +32,9 @@ class VirtualModulePlugin {
     }
 
     function resolverPlugin(request, cb) {
+
       // populate the file system cache with the virtual module
-      const fs = this.fileSystem;
+      const fs = (this && this.fileSystem) || compiler.inputFileSystem;
 
       // webpack 1.x compatibility
       if (typeof request === 'string') {
@@ -41,7 +43,7 @@ class VirtualModulePlugin {
       }
 
       if (!modulePath) {
-        modulePath = this.join(compiler.context, moduleName);
+        modulePath = path.resolve(compiler.context, moduleName);
       }
 
       const resolve = (data) => {
@@ -56,7 +58,11 @@ class VirtualModulePlugin {
       resolved.then(() => cb());
     }
 
-    if (!compiler.resolvers.normal) {
+    if (!compiler.resolvers.normal.plugin) { // Webpack 4.x
+      compiler.plugin("normal-module-factory", function (nmf) {
+        nmf.plugin("before-resolve", resolverPlugin);
+      });
+    } else if (!compiler.resolvers.normal) { // Webpack 3.x
       compiler.plugin('after-resolvers', () => {
         compiler.resolvers.normal.plugin('before-resolve', resolverPlugin);
       });
